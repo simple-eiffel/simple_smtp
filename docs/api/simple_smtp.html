@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMPLE_SMTP API Reference</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="icon" type="image/png" href="../images/logo.png">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="../images/logo.png" alt="simple_* logo" class="logo">
+        </div>
+        <h1>SIMPLE_SMTP</h1>
+        <p class="tagline">API Reference</p>
+    </header>
+
+    <nav>
+        <ul>
+            <li><a href="../index.html">Home</a></li>
+            <li><a href="#configuration">Configuration</a></li>
+            <li><a href="#recipients">Recipients</a></li>
+            <li><a href="#content">Content</a></li>
+            <li><a href="#sending">Sending</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <section>
+            <h2>Class Overview</h2>
+            <p>
+                <code>SIMPLE_SMTP</code> provides native SMTP email sending for Eiffel applications.
+                It supports TLS, authentication, HTML emails, and attachments without requiring
+                external tools or shell commands.
+            </p>
+        </section>
+
+        <section id="configuration">
+            <h2>Configuration Features</h2>
+
+            <div class="api-section">
+                <h3>make (a_host: STRING; a_port: INTEGER)</h3>
+                <div class="signature">create smtp.make ("smtp.example.com", 587)</div>
+                <p>Initialize SMTP client for the specified host and port. Automatically sets TLS mode based on port (465 = TLS, 587 = STARTTLS).</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: host_not_void: a_host /= Void</div>
+                    <div class="require">require: host_not_empty: not a_host.is_empty</div>
+                    <div class="require">require: valid_port: a_port > 0 and a_port < 65536</div>
+                    <div class="ensure">ensure: host_set: host = a_host</div>
+                    <div class="ensure">ensure: port_set: port = a_port</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>set_credentials (a_username, a_password: STRING)</h3>
+                <div class="signature">smtp.set_credentials ("user@example.com", "password")</div>
+                <p>Set authentication credentials for AUTH LOGIN.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: username_not_void: a_username /= Void</div>
+                    <div class="require">require: password_not_void: a_password /= Void</div>
+                    <div class="ensure">ensure: username_set: username = a_username</div>
+                    <div class="ensure">ensure: password_set: password = a_password</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>set_timeout (a_seconds: INTEGER)</h3>
+                <div class="signature">smtp.set_timeout (60)</div>
+                <p>Set connection timeout in seconds. Default is 30 seconds.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: positive: a_seconds > 0</div>
+                    <div class="ensure">ensure: timeout_set: timeout_seconds = a_seconds</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>enable_tls</h3>
+                <div class="signature">smtp.enable_tls</div>
+                <p>Enable TLS/SSL connection from start (port 465 style). Mutually exclusive with STARTTLS.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="ensure">ensure: tls_enabled: use_tls</div>
+                    <div class="ensure">ensure: starttls_disabled: not use_starttls</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>enable_starttls</h3>
+                <div class="signature">smtp.enable_starttls</div>
+                <p>Enable STARTTLS upgrade (port 587 style). Mutually exclusive with TLS.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="ensure">ensure: starttls_enabled: use_starttls</div>
+                    <div class="ensure">ensure: tls_disabled: not use_tls</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="recipients">
+            <h2>Recipient Features</h2>
+
+            <div class="api-section">
+                <h3>set_from (a_email: STRING; a_name: detachable STRING)</h3>
+                <div class="signature">smtp.set_from ("sender@example.com", "Sender Name")</div>
+                <p>Set sender email address and optional display name.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: email_not_void: a_email /= Void</div>
+                    <div class="require">require: email_not_empty: not a_email.is_empty</div>
+                    <div class="ensure">ensure: from_set: internal_from_email.same_string (a_email)</div>
+                    <div class="ensure">ensure: has_from: has_sender</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>add_to (a_email: STRING; a_name: detachable STRING)</h3>
+                <div class="signature">smtp.add_to ("recipient@example.com", "Recipient")</div>
+                <p>Add a To recipient with optional display name.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: email_not_void: a_email /= Void</div>
+                    <div class="require">require: email_not_empty: not a_email.is_empty</div>
+                    <div class="ensure">ensure: recipient_added: to_count = old to_count + 1</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>add_cc (a_email: STRING; a_name: detachable STRING)</h3>
+                <div class="signature">smtp.add_cc ("cc@example.com", "CC Person")</div>
+                <p>Add a Cc (carbon copy) recipient.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: email_not_void: a_email /= Void</div>
+                    <div class="require">require: email_not_empty: not a_email.is_empty</div>
+                    <div class="ensure">ensure: recipient_added: cc_count = old cc_count + 1</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>add_bcc (a_email: STRING; a_name: detachable STRING)</h3>
+                <div class="signature">smtp.add_bcc ("hidden@example.com", Void)</div>
+                <p>Add a Bcc (blind carbon copy) recipient. Not included in message headers.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: email_not_void: a_email /= Void</div>
+                    <div class="require">require: email_not_empty: not a_email.is_empty</div>
+                    <div class="ensure">ensure: recipient_added: bcc_count = old bcc_count + 1</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>clear_recipients</h3>
+                <div class="signature">smtp.clear_recipients</div>
+                <p>Clear all To, Cc, and Bcc recipients.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="ensure">ensure: no_to: to_count = 0</div>
+                    <div class="ensure">ensure: no_cc: cc_count = 0</div>
+                    <div class="ensure">ensure: no_bcc: bcc_count = 0</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="content">
+            <h2>Content Features</h2>
+
+            <div class="api-section">
+                <h3>set_subject (a_subject: STRING)</h3>
+                <div class="signature">smtp.set_subject ("Hello from Eiffel!")</div>
+                <p>Set the email subject line.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: subject_not_void: a_subject /= Void</div>
+                    <div class="ensure">ensure: subject_set: internal_subject = a_subject</div>
+                    <div class="ensure">ensure: has_subject: has_subject_set</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>set_body (a_body: STRING)</h3>
+                <div class="signature">smtp.set_body ("This is the email body.")</div>
+                <p>Set plain text body. Clears any HTML body.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: body_not_void: a_body /= Void</div>
+                    <div class="ensure">ensure: body_set: body_text = a_body</div>
+                    <div class="ensure">ensure: has_body: has_body_set</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>set_html_body (a_html: STRING)</h3>
+                <div class="signature">smtp.set_html_body ("&lt;html&gt;&lt;body&gt;&lt;h1&gt;Hello&lt;/h1&gt;&lt;/body&gt;&lt;/html&gt;")</div>
+                <p>Set HTML body for rich formatting.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: html_not_void: a_html /= Void</div>
+                    <div class="ensure">ensure: html_set: body_html = a_html</div>
+                    <div class="ensure">ensure: has_body: has_body_set</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>set_body_with_html (a_text, a_html: STRING)</h3>
+                <div class="signature">smtp.set_body_with_html ("Plain text", "&lt;html&gt;HTML&lt;/html&gt;")</div>
+                <p>Set both plain text and HTML body (multipart/alternative). Email clients choose which to display.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: text_not_void: a_text /= Void</div>
+                    <div class="require">require: html_not_void: a_html /= Void</div>
+                    <div class="ensure">ensure: text_set: body_text = a_text</div>
+                    <div class="ensure">ensure: html_set: body_html = a_html</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>add_attachment (a_filename: STRING; a_content: STRING; a_mime_type: STRING)</h3>
+                <div class="signature">smtp.add_attachment ("report.pdf", pdf_content, "application/pdf")</div>
+                <p>Add a file attachment. Content is Base64 encoded automatically.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: filename_not_void: a_filename /= Void</div>
+                    <div class="require">require: content_not_void: a_content /= Void</div>
+                    <div class="require">require: mime_not_void: a_mime_type /= Void</div>
+                    <div class="ensure">ensure: attachment_added: attachment_count = old attachment_count + 1</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>clear_attachments</h3>
+                <div class="signature">smtp.clear_attachments</div>
+                <p>Remove all attachments.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="ensure">ensure: no_attachments: attachment_count = 0</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sending">
+            <h2>Sending Features</h2>
+
+            <div class="api-section">
+                <h3>send: BOOLEAN</h3>
+                <div class="signature">if smtp.send then print ("Sent!") end</div>
+                <p>Send the email. Returns True on success. Check <code>last_error</code> on failure.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: has_from: has_sender</div>
+                    <div class="require">require: has_recipients: has_recipients</div>
+                    <div class="require">require: has_subject: has_subject_set</div>
+                    <div class="require">require: has_body: has_body_set</div>
+                    <div class="ensure">ensure: error_on_failure: not Result implies has_error</div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>send_async (a_callback: detachable PROCEDURE [BOOLEAN])</h3>
+                <div class="signature">smtp.send_async (agent handle_result)</div>
+                <p>Send email with callback for result. Currently implemented synchronously.</p>
+                <div class="contracts">
+                    <h4>Contracts</h4>
+                    <div class="require">require: has_from: has_sender</div>
+                    <div class="require">require: has_recipients: has_recipients</div>
+                    <div class="require">require: has_subject: has_subject_set</div>
+                    <div class="require">require: has_body: has_body_set</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="status">
+            <h2>Status Features</h2>
+
+            <div class="api-section">
+                <h3>has_error: BOOLEAN</h3>
+                <div class="signature">if smtp.has_error then print (smtp.last_error) end</div>
+                <p>Check if the last operation produced an error.</p>
+            </div>
+
+            <div class="api-section">
+                <h3>last_error: STRING</h3>
+                <div class="signature">error_msg := smtp.last_error</div>
+                <p>Error message from last failed operation. Empty if no error.</p>
+            </div>
+
+            <div class="api-section">
+                <h3>last_response: STRING</h3>
+                <div class="signature">response := smtp.last_response</div>
+                <p>Last SMTP server response string.</p>
+            </div>
+        </section>
+
+        <section id="query">
+            <h2>Query Features</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>has_sender</code></td>
+                        <td>BOOLEAN</td>
+                        <td>Has sender been set?</td>
+                    </tr>
+                    <tr>
+                        <td><code>has_recipients</code></td>
+                        <td>BOOLEAN</td>
+                        <td>Are there any To recipients?</td>
+                    </tr>
+                    <tr>
+                        <td><code>has_subject_set</code></td>
+                        <td>BOOLEAN</td>
+                        <td>Has subject been set?</td>
+                    </tr>
+                    <tr>
+                        <td><code>has_body_set</code></td>
+                        <td>BOOLEAN</td>
+                        <td>Has body (text or HTML) been set?</td>
+                    </tr>
+                    <tr>
+                        <td><code>to_count</code></td>
+                        <td>INTEGER</td>
+                        <td>Number of To recipients</td>
+                    </tr>
+                    <tr>
+                        <td><code>cc_count</code></td>
+                        <td>INTEGER</td>
+                        <td>Number of Cc recipients</td>
+                    </tr>
+                    <tr>
+                        <td><code>bcc_count</code></td>
+                        <td>INTEGER</td>
+                        <td>Number of Bcc recipients</td>
+                    </tr>
+                    <tr>
+                        <td><code>attachment_count</code></td>
+                        <td>INTEGER</td>
+                        <td>Number of attachments</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="invariants">
+            <h2>Class Invariants</h2>
+            <div class="contracts">
+                <div class="ensure">invariant: host_exists: host /= Void</div>
+                <div class="ensure">invariant: host_not_empty: not host.is_empty</div>
+                <div class="ensure">invariant: valid_port: port > 0 and port < 65536</div>
+                <div class="ensure">invariant: to_lists_match: to_emails.count = to_names.count</div>
+                <div class="ensure">invariant: cc_lists_match: cc_emails.count = cc_names.count</div>
+                <div class="ensure">invariant: bcc_lists_match: bcc_emails.count = bcc_names.count</div>
+                <div class="ensure">invariant: attachments_consistent: attachment_names.count = attachment_contents.count</div>
+                <div class="ensure">invariant: timeout_positive: timeout_seconds > 0</div>
+                <div class="ensure">invariant: tls_modes_exclusive: not (use_tls and use_starttls)</div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>
+            <a href="../index.html">&larr; Back to simple_smtp</a>
+        </p>
+        <p class="copyright">
+            Copyright &copy; 2024-2025 Larry Rix. MIT License.
+        </p>
+    </footer>
+</body>
+</html>
