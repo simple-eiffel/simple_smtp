@@ -60,6 +60,7 @@ feature {NONE} -- Initialization
 			create last_response.make_empty
 			create last_error.make_empty
 			create internal_from_email.make_empty
+			auth_method := Void -- Default: try LOGIN first
 		ensure
 			host_set: host = a_host
 			port_set: port = a_port
@@ -78,6 +79,26 @@ feature -- Configuration
 		ensure
 			username_set: username = a_username
 			password_set: password = a_password
+		end
+
+	set_auth_method (a_method: STRING)
+			-- Set authentication method: "PLAIN" or "LOGIN".
+			-- Default is to try LOGIN first.
+		require
+			method_not_void: a_method /= Void
+			valid_method: a_method.as_upper.same_string ("PLAIN") or a_method.as_upper.same_string ("LOGIN")
+		do
+			auth_method := a_method.as_upper
+		ensure
+			method_set: attached auth_method as m and then m.same_string (a_method.as_upper)
+		end
+
+	prefer_auth_plain
+			-- Prefer AUTH PLAIN over AUTH LOGIN.
+		do
+			set_auth_method ("PLAIN")
+		ensure
+			plain_set: attached auth_method as m and then m.same_string ("PLAIN")
 		end
 
 	set_from (a_email: STRING; a_name: detachable STRING)
@@ -466,6 +487,29 @@ feature -- Message Building
 			result_not_void: Result /= Void
 		end
 
+feature -- AUTH PLAIN Support
+
+	build_auth_plain_credentials (a_user, a_pass: STRING): STRING
+			-- Build AUTH PLAIN credentials string (Base64 encoded).
+			-- Format: \0username\0password (NUL-separated).
+		require
+			user_not_void: a_user /= Void
+			pass_not_void: a_pass /= Void
+		local
+			l_plain: STRING
+		do
+			-- AUTH PLAIN format: \0username\0password
+			create l_plain.make (a_user.count + a_pass.count + 2)
+			l_plain.append_character ('%U') -- NUL character
+			l_plain.append (a_user)
+			l_plain.append_character ('%U') -- NUL character
+			l_plain.append (a_pass)
+			Result := base64.encode (l_plain)
+		ensure
+			result_not_void: Result /= Void
+			result_not_empty: not Result.is_empty
+		end
+
 feature {NONE} -- Implementation
 
 	host: STRING
@@ -479,6 +523,10 @@ feature {NONE} -- Implementation
 
 	password: detachable STRING
 			-- Authentication password.
+
+	auth_method: detachable STRING
+			-- Preferred authentication method: "PLAIN" or "LOGIN".
+			-- If Void, tries LOGIN first.
 
 	internal_from_email: STRING
 			-- Sender email address.
@@ -573,6 +621,19 @@ feature {NONE} -- Implementation
 		end
 
 	authenticate (a_socket: NETWORK_STREAM_SOCKET; a_user, a_pass: STRING): BOOLEAN
+			-- Authenticate using configured method (LOGIN or PLAIN).
+		require
+			socket_connected: a_socket.is_connected
+		do
+			if attached auth_method as m and then m.same_string ("PLAIN") then
+				Result := authenticate_plain (a_socket, a_user, a_pass)
+			else
+				-- Default: try LOGIN
+				Result := authenticate_login (a_socket, a_user, a_pass)
+			end
+		end
+
+	authenticate_login (a_socket: NETWORK_STREAM_SOCKET; a_user, a_pass: STRING): BOOLEAN
 			-- Authenticate using AUTH LOGIN.
 		require
 			socket_connected: a_socket.is_connected
@@ -598,6 +659,36 @@ feature {NONE} -- Implementation
 				end
 			else
 				last_error := "AUTH LOGIN not supported: " + l_response
+			end
+		end
+
+	authenticate_plain (a_socket: NETWORK_STREAM_SOCKET; a_user, a_pass: STRING): BOOLEAN
+			-- Authenticate using AUTH PLAIN (RFC 4616).
+			-- Sends credentials as: \0username\0password (Base64 encoded).
+		require
+			socket_connected: a_socket.is_connected
+		local
+			l_response: STRING
+			l_credentials: STRING
+		do
+			l_credentials := build_auth_plain_credentials (a_user, a_pass)
+
+			-- Send AUTH PLAIN with credentials in one command
+			send_command (a_socket, "AUTH PLAIN " + l_credentials)
+			l_response := read_response (a_socket)
+
+			if l_response.starts_with ("235") then
+				Result := True
+			elseif l_response.starts_with ("334") then
+				-- Server wants credentials on separate line
+				send_command (a_socket, l_credentials)
+				l_response := read_response (a_socket)
+				Result := l_response.starts_with ("235")
+				if not Result then
+					last_error := "AUTH PLAIN failed: " + l_response
+				end
+			else
+				last_error := "AUTH PLAIN not supported or failed: " + l_response
 			end
 		end
 

@@ -473,4 +473,111 @@ feature -- Test: Complete Email Setup
 			assert_integers_equal ("1 attachment", 1, smtp.attachment_count)
 		end
 
+feature -- Test: AUTH PLAIN Support
+
+	test_set_auth_method_plain
+			-- Test setting AUTH method to PLAIN.
+		note
+			testing: "covers/{SIMPLE_SMTP}.set_auth_method"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_auth_method ("PLAIN")
+			assert_false ("no error", smtp.has_error)
+		end
+
+	test_set_auth_method_login
+			-- Test setting AUTH method to LOGIN.
+		note
+			testing: "covers/{SIMPLE_SMTP}.set_auth_method"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_auth_method ("LOGIN")
+			assert_false ("no error", smtp.has_error)
+		end
+
+	test_prefer_auth_plain
+			-- Test prefer_auth_plain convenience method.
+		note
+			testing: "covers/{SIMPLE_SMTP}.prefer_auth_plain"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.prefer_auth_plain
+			assert_false ("no error", smtp.has_error)
+		end
+
+	test_build_auth_plain_credentials
+			-- Test building AUTH PLAIN credentials string.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_auth_plain_credentials"
+		local
+			smtp: SIMPLE_SMTP
+			creds: STRING
+			base64: SIMPLE_BASE64
+			decoded: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			creds := smtp.build_auth_plain_credentials ("user@test.com", "password123")
+			-- Verify it's valid base64 that can be decoded
+			create base64.make
+			decoded := base64.decode (creds)
+			-- Format is \0username\0password
+			assert ("starts with nul", decoded [1].code = 0)
+			assert ("has username", decoded.has_substring ("user@test.com"))
+			assert ("has password", decoded.has_substring ("password123"))
+			-- Count NUL characters (should be 2)
+			assert_integers_equal ("two nul chars", 2, decoded.occurrences ('%U'))
+		end
+
+	test_auth_plain_credentials_format
+			-- Test AUTH PLAIN credentials format exactly.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_auth_plain_credentials"
+		local
+			smtp: SIMPLE_SMTP
+			creds: STRING
+			base64: SIMPLE_BASE64
+			decoded: STRING
+			expected: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			creds := smtp.build_auth_plain_credentials ("alice", "secret")
+			-- Decode and verify format: \0alice\0secret
+			create base64.make
+			decoded := base64.decode (creds)
+			create expected.make (13)
+			expected.append_character ('%U')
+			expected.append ("alice")
+			expected.append_character ('%U')
+			expected.append ("secret")
+			assert_strings_equal ("correct format", expected, decoded)
+		end
+
+	test_complete_email_with_auth_plain
+			-- Test complete email setup with AUTH PLAIN.
+		note
+			testing: "covers/{SIMPLE_SMTP}"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_credentials ("user@example.com", "password")
+			smtp.prefer_auth_plain
+			smtp.set_from ("sender@example.com", "Sender")
+			smtp.add_to ("recipient@example.com", "Recipient")
+			smtp.set_subject ("AUTH PLAIN Test")
+			smtp.set_body ("Testing AUTH PLAIN authentication")
+			-- Verify setup is valid (we can't test actual sending without server)
+			assert_false ("no error", smtp.has_error)
+			assert_true ("has sender", smtp.has_sender)
+			assert_true ("has recipients", smtp.has_recipients)
+			assert_true ("has subject", smtp.has_subject_set)
+			assert_true ("has body", smtp.has_body_set)
+		end
+
 end
