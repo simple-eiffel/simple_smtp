@@ -542,8 +542,6 @@ feature -- Message Building
 					Result.append (l_text)
 				end
 			end
-		ensure
-			result_not_void: Result /= Void
 		end
 
 feature -- AUTH PLAIN Support
@@ -565,7 +563,6 @@ feature -- AUTH PLAIN Support
 			l_plain.append (a_pass)
 			Result := foundation.base64_encode (l_plain)
 		ensure
-			result_not_void: Result /= Void
 			result_not_empty: not Result.is_empty
 		end
 
@@ -873,7 +870,6 @@ feature {NONE} -- Implementation
 			end
 			last_response := Result
 		ensure
-			result_not_void: Result /= Void
 			response_stored: last_response = Result
 		end
 
@@ -889,7 +885,6 @@ feature {NONE} -- Implementation
 				Result := a_email
 			end
 		ensure
-			result_not_void: Result /= Void
 			result_not_empty: not Result.is_empty
 			contains_email: Result.has_substring (a_email)
 		end
@@ -915,8 +910,6 @@ feature {NONE} -- Implementation
 			variant
 				to_count - i + 1
 			end
-		ensure
-			result_not_void: Result /= Void
 		end
 
 	format_cc_list: STRING
@@ -940,8 +933,6 @@ feature {NONE} -- Implementation
 			variant
 				cc_count - i + 1
 			end
-		ensure
-			result_not_void: Result /= Void
 		end
 
 	generate_boundary: STRING
@@ -949,7 +940,6 @@ feature {NONE} -- Implementation
 		do
 			Result := "----=_Part_" + foundation.new_uuid_compact
 		ensure
-			result_not_void: Result /= Void
 			result_not_empty: not Result.is_empty
 		end
 
@@ -999,7 +989,6 @@ feature {NONE} -- Implementation
 			-- Timezone (assume UTC for now)
 			Result.append (" +0000")
 		ensure
-			result_not_void: Result /= Void
 			result_not_empty: not Result.is_empty
 		end
 
@@ -1033,7 +1022,6 @@ feature {NONE} -- Implementation
 			end
 			Result.append (">")
 		ensure
-			result_not_void: Result /= Void
 			result_not_empty: not Result.is_empty
 			starts_with_angle: Result.item (1) = '<'
 			ends_with_angle: Result.item (Result.count) = '>'
