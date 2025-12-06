@@ -53,7 +53,7 @@
 <pre><code>&lt;library name="simple_smtp" location="$SIMPLE_SMTP/simple_smtp.ecf"/&gt;</code></pre>
                 <p>Set environment variable:</p>
 <pre><code>set SIMPLE_SMTP=D:\path\to\simple_smtp</code></pre>
-                <p>Also requires: <code>simple_base64</code></p>
+                <p>Also requires: <code>simple_base64</code>, <code>simple_uuid</code></p>
             </div>
 
             <h3>Send an Email</h3>
@@ -116,6 +116,14 @@ smtp.add_attachment (<span class="string">"data.csv"</span>, csv_content, <span 
                 <div class="feature-card">
                     <h4>Design by Contract</h4>
                     <p>Full preconditions, postconditions, and class invariants for correctness verification.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>RFC 5322 Headers</h4>
+                    <p>Auto-generated Date and Message-ID headers. UUID-based MIME boundaries for uniqueness.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Email Validation</h4>
+                    <p>Validate email addresses before sending with <code>is_valid_email</code>.</p>
                 </div>
             </div>
         </section>
@@ -183,6 +191,14 @@ smtp.add_attachment (<span class="string">"data.csv"</span>, csv_content, <span 
                     <tr>
                         <td><code>clear_recipients</code></td>
                         <td>Clear all recipients</td>
+                    </tr>
+                    <tr>
+                        <td><code>set_reply_to (email, name)</code></td>
+                        <td>Set Reply-To address (name optional)</td>
+                    </tr>
+                    <tr>
+                        <td><code>is_valid_email (address)</code></td>
+                        <td>Validate email format</td>
                     </tr>
                 </tbody>
             </table>
@@ -257,7 +273,7 @@ smtp.add_attachment (<span class="string">"data.csv"</span>, csv_content, <span 
         <section id="testing">
             <h2>Testing</h2>
             <p>
-                The library includes a comprehensive test suite with <strong>30+ tests</strong> covering:
+                The library includes a comprehensive test suite with <strong>57 tests</strong> covering:
             </p>
             <ul>
                 <li>Initialization with different port configurations</li>
@@ -265,7 +281,10 @@ smtp.add_attachment (<span class="string">"data.csv"</span>, csv_content, <span 
                 <li>Content handling (plain text, HTML, multipart)</li>
                 <li>Attachment management</li>
                 <li>Message building with proper MIME structure</li>
-                <li>Complete email setup verification</li>
+                <li>RFC 5322 headers (Date, Message-ID)</li>
+                <li>Reply-To header support</li>
+                <li>Email address validation</li>
+                <li>UUID-based MIME boundary generation</li>
             </ul>
 <pre><code><span class="comment">-- Run tests</span>
 ec.exe -batch -config simple_smtp.ecf -target simple_smtp_tests -tests</code></pre>

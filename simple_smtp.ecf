@@ -16,6 +16,7 @@
 		<library name="net" location="$ISE_LIBRARY\library\net\net.ecf"/>
 		<library name="time" location="$ISE_LIBRARY\library\time\time.ecf"/>
 		<library name="simple_base64" location="$SIMPLE_BASE64\simple_base64.ecf"/>
+		<library name="simple_uuid" location="$SIMPLE_UUID\simple_uuid.ecf"/>
 		<cluster name="src" location=".\src\" recursive="true"/>
 	</target>
 	<target name="simple_smtp_tests" extends="simple_smtp">

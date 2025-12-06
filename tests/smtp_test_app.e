@@ -74,6 +74,35 @@ feature {NONE} -- Initialization
 			run_test (agent tests.test_auth_plain_credentials_format, "test_auth_plain_credentials_format")
 			run_test (agent tests.test_complete_email_with_auth_plain, "test_complete_email_with_auth_plain")
 
+			-- RFC 5322 Headers
+			run_test (agent tests.test_build_message_has_date_header, "test_build_message_has_date_header")
+			run_test (agent tests.test_build_message_has_message_id, "test_build_message_has_message_id")
+			run_test (agent tests.test_message_id_uses_sender_domain, "test_message_id_uses_sender_domain")
+			run_test (agent tests.test_date_header_format, "test_date_header_format")
+
+			-- Reply-To Support
+			run_test (agent tests.test_set_reply_to, "test_set_reply_to")
+			run_test (agent tests.test_set_reply_to_no_name, "test_set_reply_to_no_name")
+			run_test (agent tests.test_clear_reply_to, "test_clear_reply_to")
+			run_test (agent tests.test_build_message_with_reply_to, "test_build_message_with_reply_to")
+			run_test (agent tests.test_build_message_reply_to_with_name, "test_build_message_reply_to_with_name")
+			run_test (agent tests.test_build_message_without_reply_to, "test_build_message_without_reply_to")
+
+			-- Email Validation
+			run_test (agent tests.test_valid_email_simple, "test_valid_email_simple")
+			run_test (agent tests.test_valid_email_with_subdomain, "test_valid_email_with_subdomain")
+			run_test (agent tests.test_valid_email_with_plus, "test_valid_email_with_plus")
+			run_test (agent tests.test_invalid_email_empty, "test_invalid_email_empty")
+			run_test (agent tests.test_invalid_email_no_at, "test_invalid_email_no_at")
+			run_test (agent tests.test_invalid_email_no_local, "test_invalid_email_no_local")
+			run_test (agent tests.test_invalid_email_no_domain, "test_invalid_email_no_domain")
+			run_test (agent tests.test_invalid_email_no_dot_in_domain, "test_invalid_email_no_dot_in_domain")
+			run_test (agent tests.test_invalid_email_dot_at_end, "test_invalid_email_dot_at_end")
+
+			-- UUID Boundary
+			run_test (agent tests.test_boundary_uses_uuid, "test_boundary_uses_uuid")
+			run_test (agent tests.test_boundary_uniqueness, "test_boundary_uniqueness")
+
 			print ("%N========================%N")
 			print ("Results: " + passed.out + " passed, " + failed.out + " failed%N")
 

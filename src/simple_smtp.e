@@ -60,6 +60,7 @@ feature {NONE} -- Initialization
 			create last_response.make_empty
 			create last_error.make_empty
 			create internal_from_email.make_empty
+			create uuid.make
 			auth_method := Void -- Default: try LOGIN first
 		ensure
 			host_set: host = a_host
@@ -112,6 +113,29 @@ feature -- Configuration
 		ensure
 			from_set: internal_from_email.same_string (a_email)
 			has_from: has_sender
+		end
+
+	set_reply_to (a_email: STRING; a_name: detachable STRING)
+			-- Set Reply-To email address and optional display name.
+			-- If set, recipients will reply to this address instead of From.
+		require
+			email_not_void: a_email /= Void
+			email_not_empty: not a_email.is_empty
+		do
+			reply_to_email := a_email
+			reply_to_name := a_name
+		ensure
+			reply_to_set: attached reply_to_email as rte and then rte.same_string (a_email)
+			has_reply_to: has_reply_to_set
+		end
+
+	clear_reply_to
+			-- Clear Reply-To address.
+		do
+			reply_to_email := Void
+			reply_to_name := Void
+		ensure
+			no_reply_to: not has_reply_to_set
 		end
 
 	set_timeout (a_seconds: INTEGER)
@@ -308,6 +332,37 @@ feature -- Query (public for preconditions)
 			Result := body_text /= Void or body_html /= Void
 		end
 
+	has_reply_to_set: BOOLEAN
+			-- Has Reply-To address been set?
+		do
+			Result := reply_to_email /= Void
+		end
+
+	is_valid_email (a_email: STRING): BOOLEAN
+			-- Is `a_email' a valid email address?
+			-- Basic validation: non-empty, one @, local and domain parts present.
+		local
+			l_at_pos, l_dot_pos: INTEGER
+			l_local, l_domain: STRING
+		do
+			if a_email /= Void and then not a_email.is_empty then
+				l_at_pos := a_email.index_of ('@', 1)
+				if l_at_pos > 1 and l_at_pos < a_email.count then
+					-- Has @ with characters before and after
+					l_local := a_email.substring (1, l_at_pos - 1)
+					l_domain := a_email.substring (l_at_pos + 1, a_email.count)
+					-- Domain must have at least one dot
+					l_dot_pos := l_domain.index_of ('.', 1)
+					if l_dot_pos > 1 and l_dot_pos < l_domain.count then
+						-- Dot with characters before and after
+						Result := True
+					end
+				end
+			end
+		ensure
+			empty_invalid: a_email = Void or else a_email.is_empty implies not Result
+		end
+
 	to_count: INTEGER
 			-- Number of To recipients.
 		do
@@ -416,15 +471,20 @@ feature -- Message Building
 
 			create Result.make (2048)
 
-			-- Headers
+			-- Headers (RFC 5322 required headers first)
+			Result.append ("Date: " + generate_date_header + "%R%N")
 			Result.append ("From: " + format_address (internal_from_email, from_name) + "%R%N")
 			Result.append ("To: " + format_to_list + "%R%N")
 			if cc_count > 0 then
 				Result.append ("Cc: " + format_cc_list + "%R%N")
 			end
+			if attached reply_to_email as l_reply_to then
+				Result.append ("Reply-To: " + format_address (l_reply_to, reply_to_name) + "%R%N")
+			end
 			if attached internal_subject as l_subj then
 				Result.append ("Subject: " + l_subj + "%R%N")
 			end
+			Result.append ("Message-ID: " + generate_message_id + "%R%N")
 			Result.append ("MIME-Version: 1.0%R%N")
 
 			if l_multipart then
@@ -534,6 +594,12 @@ feature {NONE} -- Implementation
 	from_name: detachable STRING
 			-- Sender display name.
 
+	reply_to_email: detachable STRING
+			-- Reply-To email address.
+
+	reply_to_name: detachable STRING
+			-- Reply-To display name.
+
 	to_emails: ARRAYED_LIST [STRING]
 			-- To recipient emails.
 
@@ -581,6 +647,9 @@ feature {NONE} -- Implementation
 
 	base64: SIMPLE_BASE64
 			-- Base64 encoder for attachments.
+
+	uuid: SIMPLE_UUID
+			-- UUID generator for MIME boundaries.
 
 	perform_smtp_session (a_socket: NETWORK_STREAM_SOCKET): BOOLEAN
 			-- Perform the SMTP conversation. Returns True on success.
@@ -880,15 +949,98 @@ feature {NONE} -- Implementation
 		end
 
 	generate_boundary: STRING
-			-- Generate a unique MIME boundary.
-		local
-			l_time: TIME
+			-- Generate a unique MIME boundary using UUID v4.
 		do
-			create l_time.make_now
-			Result := "----=_Part_" + l_time.compact_time.out + "_" + (l_time.milli_second * 1000 + l_time.second).out
+			Result := "----=_Part_" + uuid.new_v4_compact
 		ensure
 			result_not_void: Result /= Void
 			result_not_empty: not Result.is_empty
+		end
+
+	generate_date_header: STRING
+			-- Generate RFC 5322 formatted Date header value.
+			-- Format: "Fri, 06 Dec 2025 14:30:00 +0000"
+		local
+			l_date: DATE_TIME
+			l_day_names: ARRAY [STRING]
+			l_month_names: ARRAY [STRING]
+		do
+			create l_date.make_now
+			l_day_names := <<"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat">>
+			l_month_names := <<"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec">>
+
+			create Result.make (32)
+			-- Day name
+			Result.append (l_day_names [l_date.date.day_of_the_week])
+			Result.append (", ")
+			-- Day of month (2 digits)
+			if l_date.date.day < 10 then
+				Result.append ("0")
+			end
+			Result.append (l_date.date.day.out)
+			Result.append (" ")
+			-- Month name
+			Result.append (l_month_names [l_date.date.month])
+			Result.append (" ")
+			-- Year
+			Result.append (l_date.date.year.out)
+			Result.append (" ")
+			-- Time (HH:MM:SS)
+			if l_date.time.hour < 10 then
+				Result.append ("0")
+			end
+			Result.append (l_date.time.hour.out)
+			Result.append (":")
+			if l_date.time.minute < 10 then
+				Result.append ("0")
+			end
+			Result.append (l_date.time.minute.out)
+			Result.append (":")
+			if l_date.time.second < 10 then
+				Result.append ("0")
+			end
+			Result.append (l_date.time.second.out)
+			-- Timezone (assume UTC for now)
+			Result.append (" +0000")
+		ensure
+			result_not_void: Result /= Void
+			result_not_empty: not Result.is_empty
+		end
+
+	generate_message_id: STRING
+			-- Generate unique Message-ID per RFC 5322.
+			-- Format: "<timestamp.random@host>"
+		local
+			l_time: DATE_TIME
+			l_unique: INTEGER_64
+		do
+			create l_time.make_now
+			-- Create unique identifier from timestamp
+			l_unique := l_time.date.year.to_integer_64 * 10000000000 +
+						l_time.date.month.to_integer_64 * 100000000 +
+						l_time.date.day.to_integer_64 * 1000000 +
+						l_time.time.hour.to_integer_64 * 10000 +
+						l_time.time.minute.to_integer_64 * 100 +
+						l_time.time.second.to_integer_64
+
+			create Result.make (64)
+			Result.append ("<")
+			Result.append (l_unique.out)
+			Result.append (".")
+			Result.append (l_time.time.milli_second.out)
+			Result.append ("@")
+			-- Use sender domain or host as domain part
+			if internal_from_email.has ('@') then
+				Result.append (internal_from_email.substring (internal_from_email.index_of ('@', 1) + 1, internal_from_email.count))
+			else
+				Result.append (host)
+			end
+			Result.append (">")
+		ensure
+			result_not_void: Result /= Void
+			result_not_empty: not Result.is_empty
+			starts_with_angle: Result.item (1) = '<'
+			ends_with_angle: Result.item (Result.count) = '>'
 		end
 
 invariant
@@ -906,6 +1058,7 @@ invariant
 	bcc_lists_match: bcc_emails.count = bcc_names.count
 	attachments_consistent: attachment_names.count = attachment_contents.count and attachment_contents.count = attachment_types.count
 	base64_exists: base64 /= Void
+	uuid_exists: uuid /= Void
 	timeout_positive: timeout_seconds > 0
 	last_response_exists: last_response /= Void
 	last_error_exists: last_error /= Void

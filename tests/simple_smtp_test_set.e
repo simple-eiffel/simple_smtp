@@ -580,4 +580,345 @@ feature -- Test: AUTH PLAIN Support
 			assert_true ("has body", smtp.has_body_set)
 		end
 
+feature -- Test: RFC 5322 Headers
+
+	test_build_message_has_date_header
+			-- Test that built message includes Date header.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_message"
+		local
+			smtp: SIMPLE_SMTP
+			msg: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_from ("sender@test.com", Void)
+			smtp.add_to ("recipient@test.com", Void)
+			smtp.set_subject ("Date Test")
+			smtp.set_body ("Testing Date header")
+			msg := smtp.build_message
+			assert ("has date header", msg.has_substring ("Date:"))
+			-- Verify RFC 5322 format (should have day name)
+			assert ("has day name", msg.has_substring ("Mon") or msg.has_substring ("Tue") or
+					msg.has_substring ("Wed") or msg.has_substring ("Thu") or
+					msg.has_substring ("Fri") or msg.has_substring ("Sat") or msg.has_substring ("Sun"))
+		end
+
+	test_build_message_has_message_id
+			-- Test that built message includes Message-ID header.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_message"
+		local
+			smtp: SIMPLE_SMTP
+			msg: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_from ("sender@test.com", Void)
+			smtp.add_to ("recipient@test.com", Void)
+			smtp.set_subject ("Message-ID Test")
+			smtp.set_body ("Testing Message-ID header")
+			msg := smtp.build_message
+			assert ("has message-id header", msg.has_substring ("Message-ID:"))
+			assert ("message-id has angle brackets", msg.has_substring ("Message-ID: <"))
+			-- Domain should be from sender email
+			assert ("message-id has domain", msg.has_substring ("@test.com>"))
+		end
+
+	test_message_id_uses_sender_domain
+			-- Test that Message-ID uses sender email domain.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_message"
+		local
+			smtp: SIMPLE_SMTP
+			msg: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_from ("user@mydomain.org", Void)
+			smtp.add_to ("recipient@test.com", Void)
+			smtp.set_subject ("Domain Test")
+			smtp.set_body ("Testing domain extraction")
+			msg := smtp.build_message
+			assert ("message-id has sender domain", msg.has_substring ("@mydomain.org>"))
+		end
+
+	test_date_header_format
+			-- Test Date header has correct RFC 5322 format.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_message"
+		local
+			smtp: SIMPLE_SMTP
+			msg: STRING
+			date_start, date_end: INTEGER
+			date_value: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_from ("sender@test.com", Void)
+			smtp.add_to ("recipient@test.com", Void)
+			smtp.set_subject ("Format Test")
+			smtp.set_body ("Testing date format")
+			msg := smtp.build_message
+			-- Extract Date header value
+			date_start := msg.substring_index ("Date: ", 1)
+			assert ("found date header", date_start > 0)
+			date_end := msg.index_of ('%R', date_start)
+			date_value := msg.substring (date_start + 6, date_end - 1)
+			-- Should have timezone offset
+			assert ("has timezone", date_value.has_substring ("+0000"))
+			-- Should have year (2024 or 2025)
+			assert ("has year", date_value.has_substring ("2024") or date_value.has_substring ("2025") or date_value.has_substring ("2026"))
+		end
+
+feature -- Test: Reply-To Support
+
+	test_set_reply_to
+			-- Test setting Reply-To address.
+		note
+			testing: "covers/{SIMPLE_SMTP}.set_reply_to"
+			testing: "covers/{SIMPLE_SMTP}.has_reply_to_set"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_false ("no reply-to initially", smtp.has_reply_to_set)
+			smtp.set_reply_to ("replies@example.com", "Support Team")
+			assert_true ("has reply-to after set", smtp.has_reply_to_set)
+		end
+
+	test_set_reply_to_no_name
+			-- Test setting Reply-To without display name.
+		note
+			testing: "covers/{SIMPLE_SMTP}.set_reply_to"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_reply_to ("noreply@example.com", Void)
+			assert_true ("has reply-to", smtp.has_reply_to_set)
+		end
+
+	test_clear_reply_to
+			-- Test clearing Reply-To address.
+		note
+			testing: "covers/{SIMPLE_SMTP}.clear_reply_to"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_reply_to ("replies@example.com", Void)
+			assert_true ("has reply-to", smtp.has_reply_to_set)
+			smtp.clear_reply_to
+			assert_false ("no reply-to after clear", smtp.has_reply_to_set)
+		end
+
+	test_build_message_with_reply_to
+			-- Test that built message includes Reply-To header.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_message"
+		local
+			smtp: SIMPLE_SMTP
+			msg: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_from ("sender@test.com", Void)
+			smtp.add_to ("recipient@test.com", Void)
+			smtp.set_reply_to ("replies@test.com", Void)
+			smtp.set_subject ("Reply-To Test")
+			smtp.set_body ("Testing Reply-To header")
+			msg := smtp.build_message
+			assert ("has reply-to header", msg.has_substring ("Reply-To:"))
+			assert ("has reply-to email", msg.has_substring ("replies@test.com"))
+		end
+
+	test_build_message_reply_to_with_name
+			-- Test Reply-To header includes display name.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_message"
+		local
+			smtp: SIMPLE_SMTP
+			msg: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_from ("sender@test.com", Void)
+			smtp.add_to ("recipient@test.com", Void)
+			smtp.set_reply_to ("support@test.com", "Support Team")
+			smtp.set_subject ("Named Reply-To Test")
+			smtp.set_body ("Testing Reply-To with name")
+			msg := smtp.build_message
+			assert ("has reply-to header", msg.has_substring ("Reply-To:"))
+			assert ("has display name", msg.has_substring ("Support Team"))
+			assert ("has email", msg.has_substring ("support@test.com"))
+		end
+
+	test_build_message_without_reply_to
+			-- Test that message omits Reply-To when not set.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_message"
+		local
+			smtp: SIMPLE_SMTP
+			msg: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_from ("sender@test.com", Void)
+			smtp.add_to ("recipient@test.com", Void)
+			smtp.set_subject ("No Reply-To Test")
+			smtp.set_body ("No Reply-To header")
+			msg := smtp.build_message
+			assert_false ("no reply-to header", msg.has_substring ("Reply-To:"))
+		end
+
+feature -- Test: Email Validation
+
+	test_valid_email_simple
+			-- Test basic valid email address.
+		note
+			testing: "covers/{SIMPLE_SMTP}.is_valid_email"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_true ("simple email valid", smtp.is_valid_email ("user@example.com"))
+		end
+
+	test_valid_email_with_subdomain
+			-- Test email with subdomain.
+		note
+			testing: "covers/{SIMPLE_SMTP}.is_valid_email"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_true ("subdomain email valid", smtp.is_valid_email ("user@mail.example.com"))
+		end
+
+	test_valid_email_with_plus
+			-- Test email with plus sign.
+		note
+			testing: "covers/{SIMPLE_SMTP}.is_valid_email"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_true ("plus email valid", smtp.is_valid_email ("user+tag@example.com"))
+		end
+
+	test_invalid_email_empty
+			-- Test empty email is invalid.
+		note
+			testing: "covers/{SIMPLE_SMTP}.is_valid_email"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_false ("empty string invalid", smtp.is_valid_email (""))
+		end
+
+	test_invalid_email_no_at
+			-- Test email without @ is invalid.
+		note
+			testing: "covers/{SIMPLE_SMTP}.is_valid_email"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_false ("no at invalid", smtp.is_valid_email ("userexample.com"))
+		end
+
+	test_invalid_email_no_local
+			-- Test email without local part is invalid.
+		note
+			testing: "covers/{SIMPLE_SMTP}.is_valid_email"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_false ("no local part invalid", smtp.is_valid_email ("@example.com"))
+		end
+
+	test_invalid_email_no_domain
+			-- Test email without domain is invalid.
+		note
+			testing: "covers/{SIMPLE_SMTP}.is_valid_email"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_false ("no domain invalid", smtp.is_valid_email ("user@"))
+		end
+
+	test_invalid_email_no_dot_in_domain
+			-- Test email without dot in domain is invalid.
+		note
+			testing: "covers/{SIMPLE_SMTP}.is_valid_email"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_false ("no dot invalid", smtp.is_valid_email ("user@localhost"))
+		end
+
+	test_invalid_email_dot_at_end
+			-- Test email with dot at end of domain is invalid.
+		note
+			testing: "covers/{SIMPLE_SMTP}.is_valid_email"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			create smtp.make ("smtp.example.com", 587)
+			assert_false ("trailing dot invalid", smtp.is_valid_email ("user@example."))
+		end
+
+feature -- Test: UUID Boundary
+
+	test_boundary_uses_uuid
+			-- Test that MIME boundary uses UUID v4 format.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_message"
+		local
+			smtp: SIMPLE_SMTP
+			msg: STRING
+			boundary_start, boundary_end: INTEGER
+			boundary: STRING
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_from ("sender@test.com", Void)
+			smtp.add_to ("recipient@test.com", Void)
+			smtp.set_subject ("UUID Boundary Test")
+			smtp.set_body_with_html ("Text", "<html>HTML</html>")
+			msg := smtp.build_message
+			-- Extract boundary
+			boundary_start := msg.substring_index ("boundary=%"", 1)
+			assert ("found boundary", boundary_start > 0)
+			boundary_start := boundary_start + 10 -- Skip 'boundary="'
+			boundary_end := msg.index_of ('"', boundary_start)
+			boundary := msg.substring (boundary_start, boundary_end - 1)
+			-- Should have prefix and 32-char UUID (compact format)
+			assert ("has prefix", boundary.starts_with ("----=_Part_"))
+			assert_integers_equal ("correct length", 43, boundary.count) -- 11 prefix + 32 UUID
+		end
+
+	test_boundary_uniqueness
+			-- Test that each message gets a unique boundary.
+		note
+			testing: "covers/{SIMPLE_SMTP}.build_message"
+		local
+			smtp: SIMPLE_SMTP
+			msg1, msg2: STRING
+			boundary1, boundary2: STRING
+			pos: INTEGER
+		do
+			create smtp.make ("smtp.example.com", 587)
+			smtp.set_from ("sender@test.com", Void)
+			smtp.add_to ("recipient@test.com", Void)
+			smtp.set_subject ("Uniqueness Test")
+			smtp.set_body_with_html ("Text", "<html>HTML</html>")
+			msg1 := smtp.build_message
+			msg2 := smtp.build_message
+			-- Extract boundaries
+			pos := msg1.substring_index ("boundary=%"", 1) + 10
+			boundary1 := msg1.substring (pos, msg1.index_of ('"', pos) - 1)
+			pos := msg2.substring_index ("boundary=%"", 1) + 10
+			boundary2 := msg2.substring (pos, msg2.index_of ('"', pos) - 1)
+			-- Should be different
+			assert ("boundaries are different", not boundary1.same_string (boundary2))
+		end
+
 end
