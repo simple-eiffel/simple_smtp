@@ -4,7 +4,7 @@
 
 # simple_smtp
 
-**[Documentation](https://ljr1981.github.io/simple_smtp/)** | **[Watch the Build Video](https://youtu.be/0FRqhC2IiG8)**
+**[Documentation](https://simple-eiffel.github.io/simple_smtp/)** | **[Watch the Build Video](https://youtu.be/0FRqhC2IiG8)**
 
 Native SMTP email sending library for Eiffel. No shell commands, no external dependencies.
 
