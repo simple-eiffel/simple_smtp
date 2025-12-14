@@ -947,45 +947,45 @@ feature {NONE} -- Implementation
 			-- Generate RFC 5322 formatted Date header value.
 			-- Format: "Fri, 06 Dec 2025 14:30:00 +0000"
 		local
-			l_date: DATE_TIME
+			l_dt: SIMPLE_DATE_TIME
 			l_day_names: ARRAY [STRING]
 			l_month_names: ARRAY [STRING]
 		do
-			create l_date.make_now
+			create l_dt.make_now
 			l_day_names := <<"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat">>
 			l_month_names := <<"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec">>
 
 			create Result.make (32)
 			-- Day name
-			Result.append (l_day_names [l_date.date.day_of_the_week])
+			Result.append (l_day_names [((l_dt.date.day_of_week \\ 7) + 1)])
 			Result.append (", ")
 			-- Day of month (2 digits)
-			if l_date.date.day < 10 then
+			if l_dt.day < 10 then
 				Result.append ("0")
 			end
-			Result.append (l_date.date.day.out)
+			Result.append (l_dt.day.out)
 			Result.append (" ")
 			-- Month name
-			Result.append (l_month_names [l_date.date.month])
+			Result.append (l_month_names [l_dt.month])
 			Result.append (" ")
 			-- Year
-			Result.append (l_date.date.year.out)
+			Result.append (l_dt.year.out)
 			Result.append (" ")
 			-- Time (HH:MM:SS)
-			if l_date.time.hour < 10 then
+			if l_dt.hour < 10 then
 				Result.append ("0")
 			end
-			Result.append (l_date.time.hour.out)
+			Result.append (l_dt.hour.out)
 			Result.append (":")
-			if l_date.time.minute < 10 then
+			if l_dt.minute < 10 then
 				Result.append ("0")
 			end
-			Result.append (l_date.time.minute.out)
+			Result.append (l_dt.minute.out)
 			Result.append (":")
-			if l_date.time.second < 10 then
+			if l_dt.second < 10 then
 				Result.append ("0")
 			end
-			Result.append (l_date.time.second.out)
+			Result.append (l_dt.second.out)
 			-- Timezone (assume UTC for now)
 			Result.append (" +0000")
 		ensure
@@ -996,23 +996,18 @@ feature {NONE} -- Implementation
 			-- Generate unique Message-ID per RFC 5322.
 			-- Format: "<timestamp.random@host>"
 		local
-			l_time: DATE_TIME
+			l_dt2: SIMPLE_DATE_TIME
 			l_unique: INTEGER_64
 		do
-			create l_time.make_now
+			create l_dt2.make_now
 			-- Create unique identifier from timestamp
-			l_unique := l_time.date.year.to_integer_64 * 10000000000 +
-						l_time.date.month.to_integer_64 * 100000000 +
-						l_time.date.day.to_integer_64 * 1000000 +
-						l_time.time.hour.to_integer_64 * 10000 +
-						l_time.time.minute.to_integer_64 * 100 +
-						l_time.time.second.to_integer_64
+			l_unique := l_dt2.to_timestamp
 
 			create Result.make (64)
 			Result.append ("<")
 			Result.append (l_unique.out)
 			Result.append (".")
-			Result.append (l_time.time.milli_second.out)
+			Result.append (l_dt2.second.out)
 			Result.append ("@")
 			-- Use sender domain or host as domain part
 			if internal_from_email.has ('@') then
