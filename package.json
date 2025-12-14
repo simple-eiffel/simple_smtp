@@ -1,0 +1,9 @@
+{
+  "name": "simple_smtp",
+  "version": "0.1.0",
+  "description": "Simple SMTP - Native email sending for Eiffel",
+  "author": "Larry Rix",
+  "license": "MIT",
+  "category": "networking",
+  "keywords": ["smtp", "email", "mail", "sending"]
+}
