@@ -35,7 +35,47 @@ SIMPLE_FOUNDATION_API=D:\prod\simple_foundation_api
 **Dependencies:**
 - simple_foundation_api (for Base64 encoding and UUID generation)
 
-## Usage
+## Quick Start (Zero-Configuration)
+
+Use `SIMPLE_SMTP_QUICK` for the simplest possible email sending:
+
+```eiffel
+local
+    mail: SIMPLE_SMTP_QUICK
+do
+    create mail.make
+
+    -- Configure for Gmail (use App Password, not regular password)
+    mail.gmail ("your.email@gmail.com", "your-app-password")
+
+    -- Or Outlook/Office365
+    -- mail.outlook ("your.email@outlook.com", "password")
+
+    -- Or any SMTP server
+    -- mail.server ("smtp.example.com", 587, "username", "password")
+
+    -- Send plain text email
+    if mail.send ("recipient@example.com", "Subject Line", "Email body text") then
+        print ("Email sent!")
+    end
+
+    -- Send HTML email
+    mail.send_html ("recipient@example.com", "Newsletter", "<h1>Hello</h1><p>Content here</p>")
+
+    -- Send to multiple recipients
+    mail.send_to_many (<<"alice@example.com", "bob@example.com">>, "Team Update", "Message body")
+
+    -- Send with attachment
+    mail.send_with_attachment ("recipient@example.com", "Report", "See attached.", "report.pdf")
+
+    -- Error handling
+    if mail.has_error then
+        print ("Error: " + mail.last_error)
+    end
+end
+```
+
+## Standard API (Full Control)
 
 ### Basic Email
 
