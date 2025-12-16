@@ -23,13 +23,12 @@ Native SMTP email sending library for Eiffel. No shell commands, no external dep
 Add to your ECF:
 
 ```xml
-<library name="simple_smtp" location="$SIMPLE_SMTP\simple_smtp.ecf"/>
+<library name="simple_smtp" location="$SIMPLE_EIFFEL/simple_smtp/simple_smtp.ecf"/>
 ```
 
-Set environment variables:
+Set environment variable (one-time setup for all simple_* libraries):
 ```
-SIMPLE_SMTP=D:\prod\simple_smtp
-SIMPLE_FOUNDATION_API=D:\prod\simple_foundation_api
+SIMPLE_EIFFEL=D:\prod
 ```
 
 **Dependencies:**
