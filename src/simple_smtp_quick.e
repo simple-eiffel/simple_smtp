@@ -43,7 +43,7 @@ feature {NONE} -- Initialization
 	make
 			-- Create quick email facade.
 		do
-			create logger.make ("smtp_quick")
+			create logger.make
 		end
 
 feature -- Provider Configuration
