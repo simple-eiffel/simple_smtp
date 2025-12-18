@@ -518,14 +518,14 @@ feature -- Test: AUTH PLAIN Support
 		local
 			smtp: SIMPLE_SMTP
 			creds: STRING
-			foundation: FOUNDATION
+			base64: SIMPLE_BASE64
 			decoded: STRING
 		do
 			create smtp.make ("smtp.example.com", 587)
 			creds := smtp.build_auth_plain_credentials ("user@test.com", "password123")
 			-- Verify it's valid base64 that can be decoded
-			create foundation
-			decoded := foundation.base64_decode (creds)
+			create base64.make
+			decoded := base64.decode (creds)
 			-- Format is \0username\0password
 			assert ("starts with nul", decoded [1].code = 0)
 			assert ("has username", decoded.has_substring ("user@test.com"))
@@ -541,15 +541,15 @@ feature -- Test: AUTH PLAIN Support
 		local
 			smtp: SIMPLE_SMTP
 			creds: STRING
-			foundation: FOUNDATION
+			base64: SIMPLE_BASE64
 			decoded: STRING
 			expected: STRING
 		do
 			create smtp.make ("smtp.example.com", 587)
 			creds := smtp.build_auth_plain_credentials ("alice", "secret")
 			-- Decode and verify format: \0alice\0secret
-			create foundation
-			decoded := foundation.base64_decode (creds)
+			create base64.make
+			decoded := base64.decode (creds)
 			create expected.make (13)
 			expected.append_character ('%U')
 			expected.append ("alice")
