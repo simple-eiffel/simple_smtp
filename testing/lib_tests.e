@@ -524,7 +524,7 @@ feature -- Test: AUTH PLAIN Support
 			create smtp.make ("smtp.example.com", 587)
 			creds := smtp.build_auth_plain_credentials ("user@test.com", "password123")
 			-- Verify it's valid base64 that can be decoded
-			create foundation.make
+			create foundation
 			decoded := foundation.base64_decode (creds)
 			-- Format is \0username\0password
 			assert ("starts with nul", decoded [1].code = 0)
@@ -548,7 +548,7 @@ feature -- Test: AUTH PLAIN Support
 			create smtp.make ("smtp.example.com", 587)
 			creds := smtp.build_auth_plain_credentials ("alice", "secret")
 			-- Decode and verify format: \0alice\0secret
-			create foundation.make
+			create foundation
 			decoded := foundation.base64_decode (creds)
 			create expected.make (13)
 			expected.append_character ('%U')

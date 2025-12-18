@@ -53,7 +53,7 @@ feature {NONE} -- Initialization
 			create attachment_names.make (5)
 			create attachment_contents.make (5)
 			create attachment_types.make (5)
-			create foundation.make
+			create foundation
 			use_tls := (a_port = 465)
 			use_starttls := (a_port = 587)
 			timeout_seconds := 30
