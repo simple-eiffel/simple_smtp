@@ -405,18 +405,20 @@ feature -- Sending
 			has_subject: has_subject_set
 			has_body: has_body_set
 		local
-			l_socket: NETWORK_STREAM_SOCKET
+			l_client: CLIENT_SOCKET
 		do
 			last_error.wipe_out
 
-			-- Create socket and connect
-			create l_socket.make_client_by_port (port, host)
-			l_socket.connect
+			-- Create socket and connect (using simple_net CLIENT_SOCKET)
+			create l_client.make_for_host_port (host, port)
+			l_client.set_timeout (timeout_seconds.to_real)
 
-			if l_socket.is_connected then
-				Result := perform_smtp_session (l_socket)
-				l_socket.close
+			if l_client.connect then
+				Result := perform_smtp_session (l_client)
+				l_client.close
 			else
+				-- Simplified error handling: just report connection failure
+				-- simple_net tracks error details internally
 				last_error := "Failed to connect to " + host + ":" + port.out
 			end
 		ensure
@@ -648,7 +650,7 @@ feature {NONE} -- Implementation
 			-- UUID generator.
 			-- Foundation API for encoding and UUID generation.
 
-	perform_smtp_session (a_socket: NETWORK_STREAM_SOCKET): BOOLEAN
+	perform_smtp_session (a_socket: CLIENT_SOCKET): BOOLEAN
 			-- Perform the SMTP conversation. Returns True on success.
 		require
 			socket_connected: a_socket.is_connected
@@ -686,7 +688,7 @@ feature {NONE} -- Implementation
 			read_response (a_socket).do_nothing
 		end
 
-	authenticate (a_socket: NETWORK_STREAM_SOCKET; a_user, a_pass: STRING): BOOLEAN
+	authenticate (a_socket: CLIENT_SOCKET; a_user, a_pass: STRING): BOOLEAN
 			-- Authenticate using configured method (LOGIN or PLAIN).
 		require
 			socket_connected: a_socket.is_connected
@@ -699,7 +701,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	authenticate_login (a_socket: NETWORK_STREAM_SOCKET; a_user, a_pass: STRING): BOOLEAN
+	authenticate_login (a_socket: CLIENT_SOCKET; a_user, a_pass: STRING): BOOLEAN
 			-- Authenticate using AUTH LOGIN.
 		require
 			socket_connected: a_socket.is_connected
@@ -728,7 +730,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	authenticate_plain (a_socket: NETWORK_STREAM_SOCKET; a_user, a_pass: STRING): BOOLEAN
+	authenticate_plain (a_socket: CLIENT_SOCKET; a_user, a_pass: STRING): BOOLEAN
 			-- Authenticate using AUTH PLAIN (RFC 4616).
 			-- Sends credentials as: \0username\0password (Base64 encoded).
 		require
@@ -758,7 +760,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	send_mail_commands (a_socket: NETWORK_STREAM_SOCKET): BOOLEAN
+	send_mail_commands (a_socket: CLIENT_SOCKET): BOOLEAN
 			-- Send MAIL FROM, RCPT TO, DATA commands.
 		require
 			socket_connected: a_socket.is_connected
@@ -853,25 +855,23 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	send_command (a_socket: NETWORK_STREAM_SOCKET; a_command: STRING)
+	send_command (a_socket: CLIENT_SOCKET; a_command: STRING)
 			-- Send a command to the SMTP server.
 		require
 			socket_not_void: a_socket /= Void
 			command_not_void: a_command /= Void
 		do
-			a_socket.put_string (a_command + "%R%N")
+			-- Send command using simple_net CLIENT_SOCKET
+			a_socket.send_string (a_command + "%R%N").do_nothing
 		end
 
-	read_response (a_socket: NETWORK_STREAM_SOCKET): STRING
+	read_response (a_socket: CLIENT_SOCKET): STRING
 			-- Read response from SMTP server.
 		require
 			socket_not_void: a_socket /= Void
 		do
-			create Result.make (256)
-			a_socket.read_line
-			if attached a_socket.last_string as l_str then
-				Result.append (l_str)
-			end
+			-- Read response line using simple_net CLIENT_SOCKET (read up to 1024 bytes)
+			Result := a_socket.receive_string (1024)
 			last_response := Result
 		ensure
 			response_stored: last_response = Result
