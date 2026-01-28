@@ -58,8 +58,10 @@ feature -- Provider Configuration
 		do
 			logger.info ("Configuring Gmail for " + a_email)
 			create smtp.make ("smtp.gmail.com", 587)
-			smtp.set_credentials (a_email, a_app_password)
-			smtp.set_from (a_email, Void)
+			if attached smtp as s then
+				s.set_credentials (a_email, a_app_password)
+				s.set_from (a_email, Void)
+			end
 			from_email := a_email
 		ensure
 			is_configured: is_configured
@@ -73,8 +75,10 @@ feature -- Provider Configuration
 		do
 			logger.info ("Configuring Outlook for " + a_email)
 			create smtp.make ("smtp.office365.com", 587)
-			smtp.set_credentials (a_email, a_password)
-			smtp.set_from (a_email, Void)
+			if attached smtp as s then
+				s.set_credentials (a_email, a_password)
+				s.set_from (a_email, Void)
+			end
 			from_email := a_email
 		ensure
 			is_configured: is_configured
@@ -89,8 +93,10 @@ feature -- Provider Configuration
 		do
 			logger.info ("Configuring Yahoo for " + a_email)
 			create smtp.make ("smtp.mail.yahoo.com", 587)
-			smtp.set_credentials (a_email, a_app_password)
-			smtp.set_from (a_email, Void)
+			if attached smtp as s then
+				s.set_credentials (a_email, a_app_password)
+				s.set_from (a_email, Void)
+			end
 			from_email := a_email
 		ensure
 			is_configured: is_configured
@@ -106,8 +112,10 @@ feature -- Provider Configuration
 		do
 			logger.info ("Configuring SMTP server " + a_host + ":" + a_port.out)
 			create smtp.make (a_host, a_port)
-			smtp.set_credentials (a_username, a_password)
-			smtp.set_from (a_username, Void)
+			if attached smtp as s then
+				s.set_credentials (a_username, a_password)
+				s.set_from (a_username, Void)
+			end
 			from_email := a_username
 		ensure
 			is_configured: is_configured
@@ -172,9 +180,8 @@ feature -- Sending (One-liners)
 				s.add_to (a_to, Void)
 				s.set_subject (a_subject)
 				s.set_body (a_body)
-				s.send
-				last_sent := not s.has_error
-				Result := last_sent
+				Result := s.send
+				last_sent := Result
 				if Result then
 					logger.info ("Email sent successfully")
 				else
@@ -196,9 +203,8 @@ feature -- Sending (One-liners)
 				s.add_to (a_to, Void)
 				s.set_subject (a_subject)
 				s.set_html_body (a_html_body)
-				s.send
-				last_sent := not s.has_error
-				Result := last_sent
+				Result := s.send
+				last_sent := Result
 				if Result then
 					logger.info ("HTML email sent successfully")
 				else
@@ -222,9 +228,8 @@ feature -- Sending (One-liners)
 				end
 				s.set_subject (a_subject)
 				s.set_body (a_body)
-				s.send
-				last_sent := not s.has_error
-				Result := last_sent
+				Result := s.send
+				last_sent := Result
 			end
 		end
 
@@ -264,9 +269,8 @@ feature -- Advanced Sending
 				s.set_subject (a_subject)
 				s.set_body (a_body)
 				s.add_attachment (l_name, l_content, "application/octet-stream")
-				s.send
-				last_sent := not s.has_error
-				Result := last_sent
+				Result := s.send
+				last_sent := Result
 			end
 		end
 
