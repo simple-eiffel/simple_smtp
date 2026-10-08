@@ -14,8 +14,10 @@ feature {NONE} -- Initialization
 			-- Run tests.
 		local
 			tests: LIB_TESTS
+			session_tests: TEST_SMTP_SESSION
 		do
 			create tests
+			create session_tests
 			print ("simple_smtp test runner%N")
 			print ("========================%N%N")
 
@@ -102,6 +104,10 @@ feature {NONE} -- Initialization
 			-- UUID Boundary
 			run_test (agent tests.test_boundary_uses_uuid, "test_boundary_uses_uuid")
 			run_test (agent tests.test_boundary_uniqueness, "test_boundary_uniqueness")
+
+			-- Real socket session (simple_net 1.2.0)
+			run_test (agent session_tests.test_send_full_session, "test_send_full_session")
+			run_test (agent session_tests.test_send_connection_refused, "test_send_connection_refused")
 
 			print ("%N========================%N")
 			print ("Results: " + passed.out + " passed, " + failed.out + " failed%N")

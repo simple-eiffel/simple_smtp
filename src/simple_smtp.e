@@ -861,8 +861,13 @@ feature {NONE} -- Implementation
 			socket_not_void: a_socket /= Void
 			command_not_void: a_command /= Void
 		do
-			-- Send command using simple_net CLIENT_SOCKET
-			a_socket.send_string (a_command + "%R%N").do_nothing
+			-- Send command using simple_net CLIENT_SOCKET. A socket that has already
+			-- failed (or that the server closed) cannot send: record why instead.
+			if a_socket.is_connected then
+				if not a_socket.send_string (a_command + "%R%N") then
+					last_error := "Send failed: " + a_socket.last_error_string
+				end
+			end
 		end
 
 	read_response (a_socket: CLIENT_SOCKET): STRING
@@ -870,8 +875,13 @@ feature {NONE} -- Implementation
 		require
 			socket_not_void: a_socket /= Void
 		do
-			-- Read response line using simple_net CLIENT_SOCKET (read up to 1024 bytes)
-			Result := a_socket.receive_string (1024)
+			-- Read response line using simple_net CLIENT_SOCKET (read up to 1024 bytes).
+			-- Empty when the socket has failed or the server closed the connection.
+			if a_socket.is_connected then
+				Result := a_socket.receive_string (1024)
+			else
+				create Result.make_empty
+			end
 			last_response := Result
 		ensure
 			response_stored: last_response = Result
