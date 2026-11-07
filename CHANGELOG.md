@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-11-07
+
+Earlier versions sent the login and message unencrypted. Do not use them with a real account.
+
+### Changed
+- `send` now uses TLS: implicit TLS (port 465, `use_tls`) encrypts from the first
+  byte, and STARTTLS (port 587, `use_starttls`) upgrades the session after EHLO.
+  Both go through simple_email's `SE_TLS_SOCKET`, which checks the server's
+  certificate and host name.
+- Credentials are refused on a connection that is not encrypted: `send` fails
+  with "not encrypted" before AUTH, and the server never sees the password.
+- A server that does not offer STARTTLS, when it was asked for, is an error. The
+  session never falls back to plain text.
+- `read_response` reads every line of a multi-line reply.
+
 ## [1.0.1] - 2026-10-08
 
 ### Fixed

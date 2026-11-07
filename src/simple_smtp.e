@@ -405,21 +405,32 @@ feature -- Sending
 			has_subject: has_subject_set
 			has_body: has_body_set
 		local
-			l_client: CLIENT_SOCKET
+			l_client: SE_TLS_SOCKET
 		do
 			last_error.wipe_out
 
-			-- Create socket and connect (using simple_net CLIENT_SOCKET)
-			create l_client.make_for_host_port (host, port)
-			l_client.set_timeout (timeout_seconds.to_real)
-
-			if l_client.connect then
-				Result := perform_smtp_session (l_client)
-				l_client.close
+			-- Implicit TLS encrypts from the first byte; otherwise the session
+			-- starts plain and STARTTLS upgrades it.
+			create l_client.make
+			l_client.set_timeout (timeout_seconds * 1000)
+			if use_tls then
+				l_client.connect_tls (host, port)
 			else
-				-- Simplified error handling: just report connection failure
-				-- simple_net tracks error details internally
-				last_error := "Failed to connect to " + host + ":" + port.out
+				l_client.connect (host, port)
+			end
+
+			if l_client.is_connected and not l_client.has_error then
+				Result := perform_smtp_session (l_client)
+				l_client.disconnect
+			else
+				if attached l_client.last_error as al_error then
+					last_error := "Failed to connect to " + host + ":" + port.out + ": " + al_error
+				else
+					last_error := "Failed to connect to " + host + ":" + port.out
+				end
+				if l_client.is_connected then
+					l_client.disconnect
+				end
 			end
 		ensure
 			error_on_failure: not Result implies has_error
@@ -650,7 +661,7 @@ feature {NONE} -- Implementation
 			-- UUID generator.
 			-- Foundation API for encoding and UUID generation.
 
-	perform_smtp_session (a_socket: CLIENT_SOCKET): BOOLEAN
+	perform_smtp_session (a_socket: SE_TLS_SOCKET): BOOLEAN
 			-- Perform the SMTP conversation. Returns True on success.
 		require
 			socket_connected: a_socket.is_connected
@@ -670,15 +681,23 @@ feature {NONE} -- Implementation
 					last_error := "EHLO failed: " + l_response
 					Result := False
 				else
-					-- AUTH if credentials provided
-					if attached username as u and attached password as p then
-						if not authenticate (a_socket, u, p) then
-							Result := False
+					if use_starttls and not a_socket.is_tls_active then
+						upgrade_to_tls (a_socket, l_response)
+					end
+					if last_error.is_empty then
+						if attached username as u and attached password as p then
+							if not a_socket.is_tls_active then
+								-- Credentials never cross an unencrypted connection.
+								last_error := "Refused to send credentials: the connection to " + host + " is not encrypted"
+								Result := False
+							elseif not authenticate (a_socket, u, p) then
+								Result := False
+							else
+								Result := send_mail_commands (a_socket)
+							end
 						else
 							Result := send_mail_commands (a_socket)
 						end
-					else
-						Result := send_mail_commands (a_socket)
 					end
 				end
 			end
@@ -688,7 +707,39 @@ feature {NONE} -- Implementation
 			read_response (a_socket).do_nothing
 		end
 
-	authenticate (a_socket: CLIENT_SOCKET; a_user, a_pass: STRING): BOOLEAN
+	upgrade_to_tls (a_socket: SE_TLS_SOCKET; a_ehlo: STRING)
+			-- Upgrade the session with STARTTLS. A server that does not offer it is an
+			-- error: the session never falls back to plain text.
+		require
+			socket_connected: a_socket.is_connected
+		local
+			l_response: STRING
+		do
+			if not a_ehlo.as_upper.has_substring ("STARTTLS") then
+				last_error := "The server at " + host + " does not offer STARTTLS"
+			else
+				send_command (a_socket, "STARTTLS")
+				l_response := read_response (a_socket)
+				if not l_response.starts_with ("220") then
+					last_error := "STARTTLS failed: " + l_response
+				else
+					a_socket.start_tls (host)
+					if attached a_socket.last_error as al_error then
+						last_error := al_error.twin
+					else
+						send_command (a_socket, "EHLO " + host)
+						l_response := read_response (a_socket)
+						if not l_response.starts_with ("250") then
+							last_error := "EHLO after STARTTLS failed: " + l_response
+						end
+					end
+				end
+			end
+		ensure
+			encrypted_or_error: a_socket.is_tls_active or not last_error.is_empty
+		end
+
+	authenticate (a_socket: SE_TLS_SOCKET; a_user, a_pass: STRING): BOOLEAN
 			-- Authenticate using configured method (LOGIN or PLAIN).
 		require
 			socket_connected: a_socket.is_connected
@@ -701,7 +752,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	authenticate_login (a_socket: CLIENT_SOCKET; a_user, a_pass: STRING): BOOLEAN
+	authenticate_login (a_socket: SE_TLS_SOCKET; a_user, a_pass: STRING): BOOLEAN
 			-- Authenticate using AUTH LOGIN.
 		require
 			socket_connected: a_socket.is_connected
@@ -730,7 +781,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	authenticate_plain (a_socket: CLIENT_SOCKET; a_user, a_pass: STRING): BOOLEAN
+	authenticate_plain (a_socket: SE_TLS_SOCKET; a_user, a_pass: STRING): BOOLEAN
 			-- Authenticate using AUTH PLAIN (RFC 4616).
 			-- Sends credentials as: \0username\0password (Base64 encoded).
 		require
@@ -760,7 +811,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	send_mail_commands (a_socket: CLIENT_SOCKET): BOOLEAN
+	send_mail_commands (a_socket: SE_TLS_SOCKET): BOOLEAN
 			-- Send MAIL FROM, RCPT TO, DATA commands.
 		require
 			socket_connected: a_socket.is_connected
@@ -855,32 +906,43 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	send_command (a_socket: CLIENT_SOCKET; a_command: STRING)
+	send_command (a_socket: SE_TLS_SOCKET; a_command: STRING)
 			-- Send a command to the SMTP server.
 		require
 			socket_not_void: a_socket /= Void
 			command_not_void: a_command /= Void
 		do
-			-- Send command using simple_net CLIENT_SOCKET. A socket that has already
-			-- failed (or that the server closed) cannot send: record why instead.
+			-- A socket that has already failed (or that the server closed) cannot
+			-- send: record why instead.
 			if a_socket.is_connected then
-				if not a_socket.send_string (a_command + "%R%N") then
-					last_error := "Send failed: " + a_socket.last_error_string
+				a_socket.send (a_command + "%R%N")
+				if attached a_socket.last_error as al_error then
+					last_error := "Send failed: " + al_error
 				end
 			end
 		end
 
-	read_response (a_socket: CLIENT_SOCKET): STRING
+	read_response (a_socket: SE_TLS_SOCKET): STRING
 			-- Read response from SMTP server.
 		require
 			socket_not_void: a_socket /= Void
+		local
+			l_line: STRING
+			l_done: BOOLEAN
 		do
-			-- Read response line using simple_net CLIENT_SOCKET (read up to 1024 bytes).
-			-- Empty when the socket has failed or the server closed the connection.
-			if a_socket.is_connected then
-				Result := a_socket.receive_string (1024)
-			else
-				create Result.make_empty
+			-- Every line of a reply: a multi-line one continues with "250-" and
+			-- ends with "250 ". Empty when the socket failed or the server closed.
+			create Result.make (256)
+			from
+			until
+				l_done or not a_socket.is_connected
+			loop
+				l_line := a_socket.receive_line
+				if not l_line.is_empty then
+					Result.append (l_line)
+					Result.append ("%R%N")
+				end
+				l_done := l_line.count < 4 or else l_line.item (4) /= '-'
 			end
 			last_response := Result
 		ensure
