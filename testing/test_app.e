@@ -108,6 +108,8 @@ feature {NONE} -- Initialization
 			-- Real socket session (simple_net 1.2.0)
 			run_test (agent session_tests.test_send_full_session, "test_send_full_session")
 			run_test (agent session_tests.test_send_connection_refused, "test_send_connection_refused")
+			run_test (agent session_tests.test_credentials_never_cross_a_plain_connection, "test_credentials_never_cross_a_plain_connection")
+			run_test (agent session_tests.test_no_fallback_when_starttls_is_not_offered, "test_no_fallback_when_starttls_is_not_offered")
 
 			print ("%N========================%N")
 			print ("Results: " + passed.out + " passed, " + failed.out + " failed%N")

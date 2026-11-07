@@ -56,6 +56,51 @@ feature -- Tests
 			assert ("error explains", l_smtp.last_error.has_substring ("Failed to connect"))
 		end
 
+	test_credentials_never_cross_a_plain_connection
+			-- With no encryption, send refuses: the server never sees AUTH or a password.
+		local
+			l_peer: separate SMTP_TEST_PEER
+			l_smtp: SIMPLE_SMTP
+			l_transcript: STRING
+		do
+			create l_peer.make
+			create l_smtp.make ("127.0.0.1", peer_port (l_peer))
+			l_smtp.set_timeout (10)
+			l_smtp.set_credentials ("user@example.com", "secret-value")
+			l_smtp.set_from ("sender@example.com", Void)
+			l_smtp.add_to ("rcpt@example.com", Void)
+			l_smtp.set_subject ("s")
+			l_smtp.set_body ("b")
+			start_peer (l_peer)
+			refute ("send refused", l_smtp.send)
+			assert ("says why: " + l_smtp.last_error, l_smtp.last_error.has_substring ("not encrypted"))
+			l_transcript := peer_transcript (l_peer)
+			refute ("no AUTH reached the server", l_transcript.has_substring ("AUTH"))
+			refute ("no mail reached the server", l_transcript.has_substring ("MAIL FROM"))
+		end
+
+	test_no_fallback_when_starttls_is_not_offered
+			-- STARTTLS asked for and not offered: fail, never carry on in clear.
+		local
+			l_peer: separate SMTP_TEST_PEER
+			l_smtp: SIMPLE_SMTP
+			l_transcript: STRING
+		do
+			create l_peer.make
+			create l_smtp.make ("127.0.0.1", peer_port (l_peer))
+			l_smtp.set_timeout (10)
+			l_smtp.enable_starttls
+			l_smtp.set_from ("sender@example.com", Void)
+			l_smtp.add_to ("rcpt@example.com", Void)
+			l_smtp.set_subject ("s")
+			l_smtp.set_body ("b")
+			start_peer (l_peer)
+			refute ("send refused", l_smtp.send)
+			assert ("says why: " + l_smtp.last_error, l_smtp.last_error.has_substring ("STARTTLS"))
+			l_transcript := peer_transcript (l_peer)
+			refute ("no mail reached the server", l_transcript.has_substring ("MAIL FROM"))
+		end
+
 feature {NONE} -- SCOOP helpers
 
 	peer_port (a_peer: separate SMTP_TEST_PEER): INTEGER
