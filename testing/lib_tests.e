@@ -921,4 +921,90 @@ feature -- Test: UUID Boundary
 			assert ("boundaries are different", not boundary1.same_string (boundary2))
 		end
 
+feature -- Test: Header and command injection (2026-11-22)
+
+	test_refuses_line_break_in_subject
+			-- A subject that smuggles a Bcc header is refused before any connection.
+		note
+			testing: "covers/{SIMPLE_SMTP}.send", "covers/{SIMPLE_SMTP}.unsafe_field"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			smtp := safe_message
+			smtp.set_subject ("Hello%R%NBcc: victim@example.com")
+			assert_false ("unsafe", smtp.is_message_safe)
+			assert_false ("not sent", smtp.send)
+			assert ("refused, not a connection failure", smtp.last_error.starts_with ("Refused"))
+			assert ("names the field", smtp.last_error.has_substring ("subject"))
+		end
+
+	test_refuses_smtp_command_in_recipient
+			-- A recipient address that would add an SMTP command is refused.
+		note
+			testing: "covers/{SIMPLE_SMTP}.send"
+		local
+			smtp: SIMPLE_SMTP
+		do
+			smtp := safe_message
+			smtp.add_to ("a@example.com>%R%NRCPT TO:<b@example.com", Void)
+			assert_false ("not sent", smtp.send)
+			assert ("refused", smtp.last_error.starts_with ("Refused"))
+			assert ("names the field", smtp.last_error.has_substring ("To recipient"))
+		end
+
+	test_refuses_angle_bracket_in_from
+			-- '>' in the From address would close MAIL FROM:<...> early.
+		local
+			smtp: SIMPLE_SMTP
+		do
+			smtp := safe_message
+			smtp.set_from ("a@example.com> SIZE=1", Void)
+			assert_false ("unsafe", smtp.is_message_safe)
+			assert ("from named", attached smtp.unsafe_field as f and then f.has_substring ("From address"))
+		end
+
+	test_refuses_line_break_in_names_and_attachments
+			-- Display names, Bcc and attachment names are checked too.
+		local
+			smtp: SIMPLE_SMTP
+		do
+			smtp := safe_message
+			smtp.add_bcc ("c@example.com", "Carol%NX-Evil: 1")
+			assert ("bcc named", attached smtp.unsafe_field as f and then f.has_substring ("Bcc"))
+			smtp := safe_message
+			smtp.add_attachment ("report%".pdf", "data", "application/pdf")
+			assert ("attachment named", attached smtp.unsafe_field as f and then f.has_substring ("attachment"))
+			smtp := safe_message
+			smtp.set_reply_to ("r@example.com", "Reply%U")
+			assert ("NUL caught", attached smtp.unsafe_field as f and then f.has_substring ("Reply-To"))
+		end
+
+	test_ordinary_message_is_safe
+			-- A normal message passes the check (the send itself then fails to connect).
+		local
+			smtp: SIMPLE_SMTP
+		do
+			smtp := safe_message
+			smtp.add_cc ("cc@example.com", "Ann O'Brien")
+			smtp.add_attachment ("notes.txt", "hello", "text/plain")
+			assert ("safe", smtp.is_message_safe)
+			assert_false ("no listener", smtp.send)
+			assert ("a connection failure, not a refusal", smtp.last_error.starts_with ("Failed to connect"))
+		end
+
+feature {NONE} -- Test support
+
+	safe_message: SIMPLE_SMTP
+			-- A complete, safe message aimed at a port nothing listens on.
+		do
+			create Result.make ("127.0.0.1", 1)
+			Result.set_timeout (2)
+			Result.set_from ("sender@example.com", "Sender")
+			Result.add_to ("recipient@example.com", "Recipient")
+			Result.set_subject ("Hello")
+			Result.set_body ("Body")
+		ensure
+			safe: Result.is_message_safe
+		end
+
 end
