@@ -399,6 +399,10 @@ feature -- Sending
 
 	send: BOOLEAN
 			-- Send the email. Returns True on success.
+			-- Refuses, before connecting, a message whose header or envelope
+			-- fields hold a line break (see `unsafe_field'). The check runs in
+			-- every build, contracts or not, because the text usually comes
+			-- from outside the program.
 		require
 			has_from: has_sender
 			has_recipients: has_recipients
@@ -409,31 +413,108 @@ feature -- Sending
 		do
 			last_error.wipe_out
 
-			-- Implicit TLS encrypts from the first byte; otherwise the session
-			-- starts plain and STARTTLS upgrades it.
-			create l_client.make
-			l_client.set_timeout (timeout_seconds * 1000)
-			if use_tls then
-				l_client.connect_tls (host, port)
+			if attached unsafe_field as al_field then
+				last_error := "Refused: a line break or NUL in " + al_field + " would inject headers or SMTP commands"
 			else
-				l_client.connect (host, port)
-			end
-
-			if l_client.is_connected and not l_client.has_error then
-				Result := perform_smtp_session (l_client)
-				l_client.disconnect
-			else
-				if attached l_client.last_error as al_error then
-					last_error := "Failed to connect to " + host + ":" + port.out + ": " + al_error
+				-- Implicit TLS encrypts from the first byte; otherwise the session
+				-- starts plain and STARTTLS upgrades it.
+				create l_client.make
+				l_client.set_timeout (timeout_seconds * 1000)
+				if use_tls then
+					l_client.connect_tls (host, port)
 				else
-					last_error := "Failed to connect to " + host + ":" + port.out
+					l_client.connect (host, port)
 				end
-				if l_client.is_connected then
+
+				if l_client.is_connected and not l_client.has_error then
+					Result := perform_smtp_session (l_client)
 					l_client.disconnect
+				else
+					if attached l_client.last_error as al_error then
+						last_error := "Failed to connect to " + host + ":" + port.out + ": " + al_error
+					else
+						last_error := "Failed to connect to " + host + ":" + port.out
+					end
+					if l_client.is_connected then
+						l_client.disconnect
+					end
 				end
 			end
 		ensure
 			error_on_failure: not Result implies has_error
+			refused_when_unsafe: not is_message_safe implies not Result
+		end
+
+feature -- Safety
+
+	unsafe_field: detachable STRING
+			-- Name of the first header or envelope field whose text holds a
+			-- line break or NUL - or, in an address, '<' or '>' - which would
+			-- let it add headers ("Subject: hi%R%NBcc: ...") or SMTP commands
+			-- ("MAIL FROM:<a@b.c>%R%NRCPT TO:<...>"); Void when every field
+			-- is safe.
+		local
+			i: INTEGER
+		do
+			if is_unsafe_address (internal_from_email) then
+				Result := "the From address"
+			elseif attached from_name as al_name and then has_line_break (al_name) then
+				Result := "the From name"
+			elseif attached reply_to_email as al_email and then is_unsafe_address (al_email) then
+				Result := "the Reply-To address"
+			elseif attached reply_to_name as al_name and then has_line_break (al_name) then
+				Result := "the Reply-To name"
+			elseif attached internal_subject as al_subject and then has_line_break (al_subject) then
+				Result := "the subject"
+			end
+			from i := 1 until Result /= Void or i > to_emails.count loop
+				if is_unsafe_address (to_emails [i]) or has_line_break (to_names [i]) then
+					Result := "a To recipient"
+				end
+				i := i + 1
+			end
+			from i := 1 until Result /= Void or i > cc_emails.count loop
+				if is_unsafe_address (cc_emails [i]) or has_line_break (cc_names [i]) then
+					Result := "a Cc recipient"
+				end
+				i := i + 1
+			end
+			from i := 1 until Result /= Void or i > bcc_emails.count loop
+				if is_unsafe_address (bcc_emails [i]) or has_line_break (bcc_names [i]) then
+					Result := "a Bcc recipient"
+				end
+				i := i + 1
+			end
+			from i := 1 until Result /= Void or i > attachment_names.count loop
+				if has_line_break (attachment_names [i]) or attachment_names [i].has ('"') or has_line_break (attachment_types [i]) then
+					Result := "an attachment name or type"
+				end
+				i := i + 1
+			end
+		end
+
+	is_message_safe: BOOLEAN
+			-- Is every header and envelope field free of injected lines?
+		do
+			Result := unsafe_field = Void
+		ensure
+			definition: Result = (unsafe_field = Void)
+		end
+
+	has_line_break (a_text: READABLE_STRING_8): BOOLEAN
+			-- Does `a_text' hold a carriage return, line feed or NUL?
+		do
+			Result := a_text.has ('%R') or a_text.has ('%N') or a_text.has ('%U')
+		ensure
+			definition: Result = (a_text.has ('%R') or a_text.has ('%N') or a_text.has ('%U'))
+		end
+
+	is_unsafe_address (a_email: READABLE_STRING_8): BOOLEAN
+			-- Could `a_email' break out of "<...>" in an SMTP command or header?
+		do
+			Result := has_line_break (a_email) or a_email.has ('<') or a_email.has ('>')
+		ensure
+			definition: Result = (has_line_break (a_email) or a_email.has ('<') or a_email.has ('>'))
 		end
 
 	send_async (a_callback: detachable PROCEDURE [BOOLEAN])

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-22
+
+### Security
+- `send` refuses, before connecting, a message whose subject, addresses, display names or attachment
+  names hold a carriage return, line feed or NUL (or an address holding `<` or `>`). Such text could add
+  headers (`Subject: hi\r\nBcc: ...`) or SMTP commands (`MAIL FROM:<a@b.c>\r\nRCPT TO:<...>`). The check
+  runs in every build; `last_error` names the field. New queries: `unsafe_field`, `is_message_safe`,
+  `has_line_break`, `is_unsafe_address`.
+
 ## [1.1.0] - 2026-11-07
 
 Earlier versions sent the login and message unencrypted. Do not use them with a real account.

@@ -106,6 +106,13 @@ feature {NONE} -- Initialization
 			run_test (agent tests.test_boundary_uniqueness, "test_boundary_uniqueness")
 
 			-- Real socket session (simple_net 1.2.0)
+			-- Header and command injection
+			run_test (agent tests.test_refuses_line_break_in_subject, "test_refuses_line_break_in_subject")
+			run_test (agent tests.test_refuses_smtp_command_in_recipient, "test_refuses_smtp_command_in_recipient")
+			run_test (agent tests.test_refuses_angle_bracket_in_from, "test_refuses_angle_bracket_in_from")
+			run_test (agent tests.test_refuses_line_break_in_names_and_attachments, "test_refuses_line_break_in_names_and_attachments")
+			run_test (agent tests.test_ordinary_message_is_safe, "test_ordinary_message_is_safe")
+
 			run_test (agent session_tests.test_send_full_session, "test_send_full_session")
 			run_test (agent session_tests.test_send_connection_refused, "test_send_connection_refused")
 			run_test (agent session_tests.test_credentials_never_cross_a_plain_connection, "test_credentials_never_cross_a_plain_connection")
